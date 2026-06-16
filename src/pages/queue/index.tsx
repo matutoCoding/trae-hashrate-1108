@@ -37,10 +37,11 @@ export default function QueueIndex() {
       completed: number
       missed: number
       cancelled: number
+      missedCancelled: number
     }> = {}
 
     filteredSchedules.forEach(s => {
-      map[s.id] = { total: 0, waiting: 0, called: 0, processing: 0, completed: 0, missed: 0, cancelled: 0 }
+      map[s.id] = { total: 0, waiting: 0, called: 0, processing: 0, completed: 0, missed: 0, cancelled: 0, missedCancelled: 0 }
     })
 
     queues.forEach(q => {
@@ -48,6 +49,9 @@ export default function QueueIndex() {
         map[q.scheduleId].total++
         if (map[q.scheduleId][q.status] !== undefined) {
           map[q.scheduleId][q.status]++
+        }
+        if (q.status === 'cancelled' && q.missedCount >= 3) {
+          map[q.scheduleId].missedCancelled++
         }
       }
     })
@@ -117,7 +121,7 @@ export default function QueueIndex() {
         ) : (
           filteredSchedules.map(schedule => {
             const stats = scheduleQueueStats[schedule.id] || {
-              total: 0, waiting: 0, called: 0, processing: 0, completed: 0, missed: 0, cancelled: 0
+              total: 0, waiting: 0, called: 0, processing: 0, completed: 0, missed: 0, cancelled: 0, missedCancelled: 0
             }
             return (
               <View
@@ -156,8 +160,8 @@ export default function QueueIndex() {
                     <Text className='queue-stat-label'>完成</Text>
                   </View>
                   <View className='queue-stat-item'>
-                    <Text className='queue-stat-value text-danger'>{stats.missed + stats.cancelled}</Text>
-                    <Text className='queue-stat-label'>过号</Text>
+                    <Text className='queue-stat-value text-danger'>{stats.missed + stats.missedCancelled}</Text>
+                    <Text className='queue-stat-label'>过号作废</Text>
                   </View>
                 </View>
 

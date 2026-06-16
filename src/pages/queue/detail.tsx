@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { View, Text, ScrollView, Input, Picker, Textarea } from '@tarojs/components'
-import Taro, { useRouter } from '@tarojs/taro'
+import Taro, { useRouter, useDidShow } from '@tarojs/taro'
 import { useStore } from '@/store'
 import {
   BLOOD_TYPES,
@@ -20,6 +20,7 @@ import './detail.scss'
 export default function QueueDetail() {
   const router = useRouter()
   const scheduleId = router.params?.scheduleId || ''
+  const initialSlot = router.params?.slot || ''
 
   const {
     schedules,
@@ -36,15 +37,23 @@ export default function QueueDetail() {
   } = useStore()
 
   const [tab, setTab] = useState<'queue' | 'register'>('queue')
-  const [callSlotFilter, setCallSlotFilter] = useState<string>('all')
+  const [callSlotFilter, setCallSlotFilter] = useState<string>(initialSlot || 'all')
 
   const [donorName, setDonorName] = useState('')
   const [donorIdCard, setDonorIdCard] = useState('')
   const [donorPhone, setDonorPhone] = useState('')
   const [donorBloodType, setDonorBloodType] = useState<string>('unknown')
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('')
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>(initialSlot || '')
   const [registerErrors, setRegisterErrors] = useState<Record<string, string>>({})
   const [duplicateHint, setDuplicateHint] = useState<{ show: boolean; message: string }>({ show: false, message: '' })
+
+  useDidShow(() => {
+    if (router.params?.slot) {
+      setCallSlotFilter(router.params.slot as string)
+      setSelectedTimeSlot(router.params.slot as string)
+      setTab('queue')
+    }
+  })
 
   const schedule = useMemo(() => {
     return schedules.find(s => s.id === scheduleId)
@@ -90,20 +99,23 @@ export default function QueueDetail() {
   }, [queues, scheduleId])
 
   const slotsStats = useMemo(() => {
-    const stats: Record<string, { waiting: number; called: number; processing: number; completed: number; missed: number; cancelled: number; total: number }> = {}
+    const stats: Record<string, { waiting: number; called: number; processing: number; completed: number; missed: number; missedCancelled: number; cancelled: number; total: number }> = {}
     for (const s of availableSlots) {
-      stats[s.slot] = { waiting: 0, called: 0, processing: 0, completed: 0, missed: 0, cancelled: 0, total: s.capacity }
+      stats[s.slot] = { waiting: 0, called: 0, processing: 0, completed: 0, missed: 0, missedCancelled: 0, cancelled: 0, total: s.capacity }
     }
     for (const q of scheduleQueues) {
       if (!stats[q.timeSlot]) {
-        stats[q.timeSlot] = { waiting: 0, called: 0, processing: 0, completed: 0, missed: 0, cancelled: 0, total: 10 }
+        stats[q.timeSlot] = { waiting: 0, called: 0, processing: 0, completed: 0, missed: 0, missedCancelled: 0, cancelled: 0, total: 10 }
       }
       if (q.status === 'waiting') stats[q.timeSlot].waiting++
       else if (q.status === 'called') stats[q.timeSlot].called++
       else if (q.status === 'processing') stats[q.timeSlot].processing++
       else if (q.status === 'completed') stats[q.timeSlot].completed++
       else if (q.status === 'missed') stats[q.timeSlot].missed++
-      else if (q.status === 'cancelled') stats[q.timeSlot].cancelled++
+      else if (q.status === 'cancelled') {
+        stats[q.timeSlot].cancelled++
+        if (q.missedCount >= 3) stats[q.timeSlot].missedCancelled++
+      }
     }
     return stats
   }, [scheduleQueues, availableSlots])
@@ -406,6 +418,10 @@ export default function QueueDetail() {
                           <View className='slot-stat-item'>
                             <Text className='slot-stat-num' style={{ color: QUEUE_STATUS_COLORS.completed }}>{stat.completed}</Text>
                             <Text className='slot-stat-label'>已完成</Text>
+                          </View>
+                          <View className='slot-stat-item'>
+                            <Text className='slot-stat-num text-danger'>{stat.missedCancelled || 0}</Text>
+                            <Text className='slot-stat-label'>过号作废</Text>
                           </View>
                         </View>
                       </View>

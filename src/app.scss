@@ -538,12 +538,19 @@ page {
   padding: 6px 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
   margin-bottom: 4px;
 
   &.has-queue {
     background: #FEE2E2;
   }
+}
+
+.week-cell-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
 }
 
 .week-cell-time {
@@ -552,11 +559,55 @@ page {
   font-weight: 600;
 }
 
+.week-cell-pressure {
+  font-size: 18px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 1.2;
+
+  &.week-cell-pressure-badge-low {
+    background: #10B981;
+    color: #fff;
+  }
+  &.week-cell-pressure-badge-mid {
+    background: #F59E0B;
+    color: #fff;
+  }
+  &.week-cell-pressure-badge-high {
+    background: #DC2626;
+    color: #fff;
+  }
+}
+
 .week-cell-meta {
   font-size: 20px;
   color: #6B7280;
   display: flex;
   justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.week-cell-tag {
+  font-size: 18px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+
+  &.week-cell-tag-badge-low {
+    background: #D1FAE5;
+    color: #065F46;
+  }
+  &.week-cell-tag-badge-mid {
+    background: #FEF3C7;
+    color: #92400E;
+  }
+  &.week-cell-tag-badge-high {
+    background: #FEE2E2;
+    color: #991B1B;
+  }
 }
 
 .week-cell-empty {

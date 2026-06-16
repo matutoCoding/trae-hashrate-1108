@@ -5,11 +5,18 @@ import { useStore } from '@/store'
 import { WEEK_DAY_LABELS } from '@/types'
 import './bigscreen.scss'
 
+const formatQueueNumber = (n: number) => `A${String(n).padStart(3, '0')}`
+
 export default function BigScreen() {
   const router = useRouter()
   const { schedules, queues, sites } = useStore()
   const scheduleId = router.params.scheduleId as string
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString('zh-CN', { hour12: false }))
+  const [tick, setTick] = useState(0)
+
+  useDidShow(() => {
+    setTick(t => t + 1)
+  })
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -18,20 +25,20 @@ export default function BigScreen() {
     return () => clearInterval(timer)
   }, [])
 
-  const schedule = useMemo(() => schedules.find(s => s.id === scheduleId), [schedules, scheduleId])
-  const site = useMemo(() => sites.find(s => s.id === schedule?.siteId), [sites, schedule])
+  const schedule = useMemo(() => schedules.find(s => s.id === scheduleId), [schedules, scheduleId, tick])
+  const site = useMemo(() => sites.find(s => s.id === schedule?.siteId), [sites, schedule, tick])
 
   const queueList = useMemo(() => {
     if (!scheduleId) return []
     return queues
       .filter(q => q.scheduleId === scheduleId && q.status !== 'cancelled')
-      .sort((a, b) => a.number - b.number)
-  }, [queues, scheduleId])
+      .sort((a, b) => a.queueNumber - b.queueNumber)
+  }, [queues, scheduleId, tick])
 
   const currentCalled = useMemo(() => {
     const processing = queueList.filter(q => q.status === 'processing')
     const called = queueList.filter(q => q.status === 'called')
-    return [...processing, ...called]
+    return [...processing, ...called].sort((a, b) => a.queueNumber - b.queueNumber)
   }, [queueList])
 
   const waitingList = useMemo(() => {
@@ -39,13 +46,16 @@ export default function BigScreen() {
   }, [queueList])
 
   const stats = useMemo(() => {
-    const total = queueList.length
     const completed = queueList.filter(q => q.status === 'completed').length
     const waiting = queueList.filter(q => q.status === 'waiting').length
     const processing = queueList.filter(q => q.status === 'called' || q.status === 'processing').length
-    const stations = schedule?.stations || 3
-    const freeStations = Math.max(0, stations - processing)
-    return { total, completed, waiting, processing, stations, freeStations }
+    return {
+      total: queueList.length,
+      completed,
+      waiting,
+      processing,
+      stations: schedule?.stations || 3
+    }
   }, [queueList, schedule])
 
   const getWeekDay = (dateStr: string) => {
@@ -54,10 +64,6 @@ export default function BigScreen() {
   }
 
   const handleBack = () => {
-    Taro.navigateBack()
-  }
-
-  const handleCallNext = () => {
     Taro.navigateBack()
   }
 
@@ -97,8 +103,8 @@ export default function BigScreen() {
               <View className='current-calling-list'>
                 {currentCalled.map(item => (
                   <View key={item.id} className={`current-calling-item ${item.status === 'processing' ? 'is-processing' : ''}`}>
-                    <Text className='current-calling-number'>{String(item.number).padStart(3, '0')}</Text>
-                    <Text className='current-calling-name'>{item.name || '献血者'}</Text>
+                    <Text className='current-calling-number'>{formatQueueNumber(item.queueNumber)}</Text>
+                    <Text className='current-calling-name'>{item.donorName || '献血者'}</Text>
                     {item.timeSlot && (
                       <Text className='current-calling-slot'>{item.timeSlot} 时段</Text>
                     )}
@@ -112,17 +118,18 @@ export default function BigScreen() {
             <View className='station-block-title'>采血位状态</View>
             <View className='station-grid'>
               {Array.from({ length: schedule.stations }, (_, i) => {
-                const idx = i
-                const calledItem = currentCalled[idx]
+                const calledItem = currentCalled[i]
                 const isBusy = !!calledItem
                 return (
                   <View key={i} className={`station-card ${isBusy ? 'station-busy' : 'station-free'}`}>
                     <View className='station-no'>{i + 1}号采位</View>
                     {isBusy ? (
                       <>
-                        <View className='station-status-text'>采集中</View>
-                        <View className='station-number'>{String(calledItem.number).padStart(3, '0')}</View>
-                        <View className='station-name'>{calledItem.name || '献血者'}</View>
+                        <View className='station-status-text'>
+                          {calledItem.status === 'processing' ? '采集中' : '已叫号'}
+                        </View>
+                        <View className='station-number'>{formatQueueNumber(calledItem.queueNumber)}</View>
+                        <View className='station-name'>{calledItem.donorName || '献血者'}</View>
                       </>
                     ) : (
                       <>
@@ -150,8 +157,8 @@ export default function BigScreen() {
                 waitingList.map((item, idx) => (
                   <View key={item.id} className='waiting-item'>
                     <Text className='waiting-index'>{idx + 1}</Text>
-                    <Text className='waiting-number'>{String(item.number).padStart(3, '0')}</Text>
-                    <Text className='waiting-name'>{item.name || '献血者'}</Text>
+                    <Text className='waiting-number'>{formatQueueNumber(item.queueNumber)}</Text>
+                    <Text className='waiting-name'>{item.donorName || '献血者'}</Text>
                     {item.timeSlot && (
                       <Text className='waiting-slot'>{item.timeSlot}</Text>
                     )}

@@ -32,9 +32,9 @@ export default function SchedulesIndex() {
   }, [schedules, filterSiteId, filterDate])
 
   const scheduleStats = useMemo(() => {
-    const map: Record<string, { total: number; waiting: number; completed: number; cancelled: number }> = {}
+    const map: Record<string, { total: number; waiting: number; completed: number; missedCancelled: number; cancelled: number }> = {}
     schedules.forEach(s => {
-      map[s.id] = { total: 0, waiting: 0, completed: 0, cancelled: 0 }
+      map[s.id] = { total: 0, waiting: 0, completed: 0, missedCancelled: 0, cancelled: 0 }
     })
     queues.forEach(q => {
       if (map[q.scheduleId]) {
@@ -47,6 +47,7 @@ export default function SchedulesIndex() {
         }
         if (q.status === 'cancelled') {
           map[q.scheduleId].cancelled++
+          if (q.missedCount >= 3) map[q.scheduleId].missedCancelled++
         }
       }
     })
@@ -309,7 +310,7 @@ export default function SchedulesIndex() {
                             <View className='week-cell-empty'>—</View>
                           ) : (
                             cellList.map(sch => {
-                              const stat = scheduleStats[sch.id] || { total: 0, waiting: 0, completed: 0, cancelled: 0 }
+                              const stat = scheduleStats[sch.id] || { total: 0, waiting: 0, completed: 0, missedCancelled: 0, cancelled: 0 }
                               const capacity = (sch.capacityPerSlot || 10) * (Math.max(1, Math.floor(
                                 (parseInt(sch.endTime.split(':')[0]) * 60 + parseInt(sch.endTime.split(':')[1])
                                   - parseInt(sch.startTime.split(':')[0]) * 60 - parseInt(sch.startTime.split(':')[1]))
@@ -322,10 +323,16 @@ export default function SchedulesIndex() {
                                   className={`week-cell-schedule ${stat.total > 0 ? 'has-queue' : ''}`}
                                   onClick={(e) => { e.stopPropagation(); showScheduleActions(sch, d) }}
                                 >
-                                  <View className='week-cell-time'>{sch.startTime}-{sch.endTime}</View>
+                                  <View className='week-cell-head'>
+                                    <View className='week-cell-time'>{sch.startTime}-{sch.endTime}</View>
+                                    <View className={`week-cell-pressure week-cell-pressure-${pressure.cls}`}>
+                                      {pressure.percent}%
+                                    </View>
+                                  </View>
                                   <View className='week-cell-meta'>
                                     <Text>{sch.stations}采位</Text>
                                     <Text>{stat.total}人</Text>
+                                    <Text className={`week-cell-tag week-cell-tag-${pressure.cls}`}>{pressure.label}</Text>
                                   </View>
                                 </View>
                               )
@@ -398,7 +405,7 @@ export default function SchedulesIndex() {
                   </View>
 
                   {groupedByDate[date].map(schedule => {
-                    const stats = scheduleStats[schedule.id] || { total: 0, waiting: 0, completed: 0, cancelled: 0 }
+                    const stats = scheduleStats[schedule.id] || { total: 0, waiting: 0, completed: 0, missedCancelled: 0, cancelled: 0 }
                     return (
                       <View key={schedule.id} className='schedule-card'>
                         <View className='schedule-card-header'>
@@ -437,8 +444,8 @@ export default function SchedulesIndex() {
                             <Text className='stat-mini-label'>完成</Text>
                           </View>
                           <View className='stat-mini'>
-                            <Text className='stat-mini-value text-danger'>{stats.cancelled}</Text>
-                            <Text className='stat-mini-label'>作废</Text>
+                            <Text className='stat-mini-value text-danger'>{stats.missedCancelled}</Text>
+                            <Text className='stat-mini-label'>过号作废</Text>
                           </View>
                         </View>
 
