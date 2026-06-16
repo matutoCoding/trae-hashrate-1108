@@ -1,0 +1,27 @@
+.schedules-edit-page {
+  min-height: 100vh;
+  background: #F3F4F6;
+  padding-bottom: 40px;
+}
+
+.form-item-error {
+  display: block;
+  font-size: 22px;
+  color: #DC2626;
+  margin-top: 8px;
+}
+
+.form-row {
+  display: flex;
+  gap: 20px;
+}
+
+.form-item-half {
+  flex: 1;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 20px;
+  padding-top: 16px;
+}

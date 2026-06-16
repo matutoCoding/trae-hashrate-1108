@@ -1,0 +1,267 @@
+.queue-detail-page {
+  min-height: 100vh;
+  background: #F3F4F6;
+}
+
+.schedule-info-bar {
+  background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%);
+  padding: 32px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #FFFFFF;
+}
+
+.schedule-info-main {
+  display: flex;
+  flex-direction: column;
+}
+
+.schedule-info-site {
+  font-size: 34px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.schedule-info-date {
+  font-size: 26px;
+  opacity: 0.9;
+}
+
+.schedule-info-stations {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 16px 28px;
+  border-radius: 14px;
+}
+
+.stations-num {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.stations-label {
+  font-size: 22px;
+  margin-top: 4px;
+  opacity: 0.9;
+}
+
+.tabs {
+  display: flex;
+  background: #FFFFFF;
+  padding: 8px 24px;
+  gap: 16px;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.tab-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 20px 16px;
+  border-radius: 12px;
+  font-size: 28px;
+  color: #6B7280;
+  position: relative;
+  transition: all 0.2s;
+}
+
+.tab-item-active {
+  background: #FEF2F2;
+  color: #DC2626;
+  font-weight: 600;
+}
+
+.tab-icon {
+  font-size: 28px;
+}
+
+.tab-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: #DC2626;
+  color: #FFFFFF;
+  font-size: 20px;
+  min-width: 36px;
+  height: 36px;
+  line-height: 36px;
+  text-align: center;
+  border-radius: 18px;
+  padding: 0 10px;
+  font-weight: 600;
+}
+
+.calling-card {
+  background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%);
+  border-radius: 20px;
+  padding: 36px 28px;
+  margin-bottom: 24px;
+  text-align: center;
+  color: #FFFFFF;
+  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.3);
+}
+
+.calling-label {
+  font-size: 26px;
+  opacity: 0.9;
+  margin-bottom: 12px;
+}
+
+.calling-number {
+  font-size: 100px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 4px;
+  margin-bottom: 12px;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.calling-name {
+  font-size: 32px;
+  font-weight: 600;
+  margin-bottom: 28px;
+}
+
+.calling-actions {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.queue-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+  border-bottom: 1px solid #F3F4F6;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.queue-item-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.queue-item-number {
+  width: 96px;
+  height: 96px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+  background: #E5E7EB;
+  color: #374151;
+  flex-shrink: 0;
+
+  &.urgent {
+    background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+    color: #92400E;
+  }
+
+  &.processing {
+    background: linear-gradient(135deg, #EDE9FE 0%, #DDD6FE 100%);
+    color: #5B21B6;
+  }
+
+  &.called {
+    background: linear-gradient(135deg, #FEF3C7 0%, #FDE68A 100%);
+    color: #92400E;
+  }
+
+  &.finished {
+    background: #F3F4F6;
+    color: #9CA3AF;
+  }
+}
+
+.queue-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.queue-item-name {
+  font-size: 30px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.queue-item-status {
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.queue-item-meta {
+  display: flex;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.queue-item-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.form-item-error {
+  display: block;
+  font-size: 22px;
+  color: #DC2626;
+  margin-top: 8px;
+}
+
+.empty-small {
+  padding: 40px 20px;
+  text-align: center;
+  color: #9CA3AF;
+  font-size: 26px;
+}
+
+.interval-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #EFF6FF;
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 8px;
+}
+
+.interval-notice-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.interval-notice-text {
+  font-size: 24px;
+  color: #1E40AF;
+  line-height: 1.5;
+}
+
+.queue-item-processing {
+  background: #FAF5FF;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 8px;
+}
+
+.queue-item-called {
+  background: #FFFBEB;
+  border-radius: 12px;
+  padding: 16px 20px;
+  margin-bottom: 8px;
+}

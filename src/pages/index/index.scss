@@ -1,0 +1,171 @@
+.index-page {
+  min-height: 100vh;
+  background: #F3F4F6;
+}
+
+.header {
+  position: relative;
+  padding: 0 0 60px;
+  margin-bottom: -40px;
+}
+
+.header-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 320px;
+  background: linear-gradient(135deg, #DC2626 0%, #B91C1C 50%, #991B1B 100%);
+  border-radius: 0 0 40px 40px;
+}
+
+.header-content {
+  position: relative;
+  padding: 40px 32px 0;
+}
+
+.header-title {
+  display: flex;
+  flex-direction: column;
+}
+
+.header-title-main {
+  font-size: 44px;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin-bottom: 8px;
+}
+
+.header-title-sub {
+  font-size: 26px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.module-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.module-item {
+  background: #F9FAFB;
+  border-radius: 16px;
+  padding: 28px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  transition: all 0.2s;
+
+  &:active {
+    transform: scale(0.97);
+    background: #F3F4F6;
+  }
+}
+
+.module-icon {
+  width: 88px;
+  height: 88px;
+  border-radius: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44px;
+  margin-bottom: 20px;
+}
+
+.module-title {
+  font-size: 30px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+.module-desc {
+  font-size: 24px;
+  color: #6B7280;
+}
+
+.card-more {
+  font-size: 24px;
+  color: #DC2626;
+  font-weight: 400;
+}
+
+.schedule-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+  border-bottom: 1px solid #F3F4F6;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.schedule-item-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.schedule-item-time {
+  font-size: 28px;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 6px;
+}
+
+.schedule-item-site {
+  font-size: 24px;
+  color: #6B7280;
+}
+
+.schedule-item-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.schedule-item-stations {
+  font-size: 24px;
+  color: #374151;
+}
+
+.stats-detail {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 12px 0;
+}
+
+.stats-detail-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+}
+
+.stats-detail-value {
+  font-size: 40px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.stats-detail-label {
+  font-size: 22px;
+  color: #6B7280;
+}
+
+.stats-detail-divider {
+  width: 1px;
+  height: 80px;
+  background: #E5E7EB;
+}

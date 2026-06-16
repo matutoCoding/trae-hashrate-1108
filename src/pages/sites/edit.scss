@@ -1,0 +1,25 @@
+.sites-edit-page {
+  min-height: 100vh;
+  background: #F3F4F6;
+  padding-bottom: 40px;
+}
+
+.form-item-error {
+  display: block;
+  font-size: 22px;
+  color: #DC2626;
+  margin-top: 8px;
+}
+
+.form-item-hint {
+  display: block;
+  font-size: 22px;
+  color: #9CA3AF;
+  margin-top: 8px;
+}
+
+.footer-actions {
+  display: flex;
+  gap: 20px;
+  padding-top: 16px;
+}
