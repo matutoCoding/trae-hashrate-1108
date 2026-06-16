@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { View, Text, ScrollView, Input, Picker, Textarea } from '@tarojs/components'
-import Taro, { useRouter, useDidShow } from '@tarojs/taro'
+import Taro, { useRouter } from '@tarojs/taro'
 import { useStore } from '@/store'
 import {
   BLOOD_TYPES,
@@ -28,7 +28,6 @@ export default function QueueDetail() {
     completeDonation
   } = useStore()
 
-  const [, forceUpdate] = useState(0)
   const [tab, setTab] = useState<'queue' | 'register'>('queue')
 
   const [donorName, setDonorName] = useState('')
@@ -36,10 +35,6 @@ export default function QueueDetail() {
   const [donorPhone, setDonorPhone] = useState('')
   const [donorBloodType, setDonorBloodType] = useState<string>('unknown')
   const [registerErrors, setRegisterErrors] = useState<Record<string, string>>({})
-
-  useDidShow(() => {
-    forceUpdate(v => v + 1)
-  })
 
   const schedule = useMemo(() => {
     return schedules.find(s => s.id === scheduleId)

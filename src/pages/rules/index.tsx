@@ -1,18 +1,13 @@
 import { useState, useMemo } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro from '@tarojs/taro'
 import { useStore } from '@/store'
 import { WEEK_DAY_LABELS } from '@/types'
 import './index.scss'
 
 export default function RulesIndex() {
   const { rules, deleteRule, batchGenerateSchedules, schedules } = useStore()
-  const [, forceUpdate] = useState(0)
   const [generating, setGenerating] = useState(false)
-
-  useDidShow(() => {
-    forceUpdate(v => v + 1)
-  })
 
   const ruleScheduleCount = useMemo(() => {
     const map: Record<string, number> = {}

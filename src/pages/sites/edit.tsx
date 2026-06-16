@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { View, Text, Input, ScrollView } from '@tarojs/components'
-import Taro, { useRouter, useDidShow } from '@tarojs/taro'
+import Taro, { useRouter } from '@tarojs/taro'
 import { useStore } from '@/store'
 import { validatePhone } from '@/utils'
 import './edit.scss'

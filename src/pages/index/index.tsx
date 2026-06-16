@@ -1,8 +1,8 @@
 import { useState, useMemo } from 'react'
-import { View, Text, ScrollView, useDidShow } from '@tarojs/components'
-import Taro from '@tarojs/taro'
+import { View, Text, ScrollView } from '@tarojs/components'
+import Taro, { useDidShow } from '@tarojs/taro'
 import { useStore } from '@/store'
-import { formatDate, formatDateTime, isSameDay } from '@/utils'
+import { formatDate } from '@/utils'
 import './index.scss'
 
 export default function Index() {

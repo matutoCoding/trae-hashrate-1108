@@ -1,16 +1,11 @@
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import { View, Text, ScrollView } from '@tarojs/components'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro from '@tarojs/taro'
 import { useStore } from '@/store'
 import './index.scss'
 
 export default function SitesIndex() {
   const { sites, deleteSite, schedules } = useStore()
-  const [, forceUpdate] = useState(0)
-
-  useDidShow(() => {
-    forceUpdate(v => v + 1)
-  })
 
   const siteScheduleCount = useMemo(() => {
     const map: Record<string, number> = {}

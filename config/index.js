@@ -1,4 +1,5 @@
 const path = require('path')
+
 const config = {
   projectName: 'blood-donation-schedule',
   date: '2026-6-17',
@@ -45,6 +46,9 @@ const config = {
           generateScopedName: '[name]__[local]___[hash:base64:5]'
         }
       }
+    },
+    webpackChain(chain) {
+      chain.plugins.delete('progress-plugin')
     }
   },
   h5: {
@@ -66,6 +70,9 @@ const config = {
     },
     devServer: {
       port: 10086
+    },
+    webpackChain(chain) {
+      chain.plugins.delete('progress-plugin')
     }
   }
 }

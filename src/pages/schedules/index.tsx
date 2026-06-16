@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { View, Text, ScrollView, Picker } from '@tarojs/components'
-import Taro, { useDidShow } from '@tarojs/taro'
+import Taro from '@tarojs/taro'
 import { useStore } from '@/store'
 import { formatDate, addDays } from '@/utils'
 import { WEEK_DAY_LABELS } from '@/types'
@@ -8,13 +8,8 @@ import './index.scss'
 
 export default function SchedulesIndex() {
   const { sites, schedules, deleteSchedule, queues } = useStore()
-  const [, forceUpdate] = useState(0)
   const [filterSiteId, setFilterSiteId] = useState('')
   const [filterDate, setFilterDate] = useState('')
-
-  useDidShow(() => {
-    forceUpdate(v => v + 1)
-  })
 
   const filteredSchedules = useMemo(() => {
     let list = [...schedules]

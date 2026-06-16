@@ -1,4 +1,12 @@
-import { useState, useEffect, useCallback } from 'react'
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef
+} from 'react'
 import Taro from '@tarojs/taro'
 import {
   DonationSite,
@@ -99,21 +107,55 @@ function initDemoData() {
   }
 }
 
-export function useStore() {
+export interface StoreContextValue {
+  sites: DonationSite[]
+  rules: CycleRule[]
+  schedules: Schedule[]
+  donors: Donor[]
+  queues: QueueItem[]
+  addSite: (site: Omit<DonationSite, 'id' | 'createTime'>) => DonationSite
+  updateSite: (id: string, updates: Partial<DonationSite>) => void
+  deleteSite: (id: string) => void
+  addRule: (rule: Omit<CycleRule, 'id' | 'createTime'>) => CycleRule
+  updateRule: (id: string, updates: Partial<CycleRule>) => void
+  deleteRule: (id: string) => void
+  batchGenerateSchedules: (ruleId: string) => Schedule[]
+  addSchedule: (schedule: Omit<Schedule, 'id' | 'createTime'>) => Schedule
+  updateSchedule: (id: string, updates: Partial<Schedule>) => void
+  deleteSchedule: (id: string) => void
+  getOrCreateDonor: (donorInfo: Omit<Donor, 'id' | 'createTime'>) => Donor
+  updateDonor: (id: string, updates: Partial<Donor>) => void
+  addQueueItem: (item: Omit<QueueItem, 'id' | 'queueNumber' | 'status' | 'missedCount' | 'createTime' | 'updateTime'>) => QueueItem
+  updateQueueItem: (id: string, updates: Partial<QueueItem>) => void
+  callNextNumber: (scheduleId: string) => QueueItem | null
+  markMissed: (id: string) => void
+  completeDonation: (id: string) => void
+  forceRehydrate: () => void
+}
+
+const StoreContext = createContext<StoreContextValue | null>(null)
+
+export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [sites, setSites] = useState<DonationSite[]>([])
   const [rules, setRules] = useState<CycleRule[]>([])
   const [schedules, setSchedules] = useState<Schedule[]>([])
   const [donors, setDonors] = useState<Donor[]>([])
   const [queues, setQueues] = useState<QueueItem[]>([])
+  const rehydrateCount = useRef(0)
 
-  useEffect(() => {
+  const rehydrate = useCallback(() => {
     initDemoData()
     setSites(getStorage<DonationSite[]>(STORAGE_KEYS.sites, []))
     setRules(getStorage<CycleRule[]>(STORAGE_KEYS.rules, []))
     setSchedules(getStorage<Schedule[]>(STORAGE_KEYS.schedules, []))
     setDonors(getStorage<Donor[]>(STORAGE_KEYS.donors, []))
     setQueues(getStorage<QueueItem[]>(STORAGE_KEYS.queues, []))
+    rehydrateCount.current++
   }, [])
+
+  useEffect(() => {
+    rehydrate()
+  }, [rehydrate])
 
   const saveSites = useCallback((list: DonationSite[]) => {
     setSites(list)
@@ -146,7 +188,8 @@ export function useStore() {
       id: generateId(),
       createTime: formatDateTime(new Date())
     }
-    saveSites([...sites, newSite])
+    const list = [...sites, newSite]
+    saveSites(list)
     return newSite
   }, [sites, saveSites])
 
@@ -170,8 +213,7 @@ export function useStore() {
   }, [rules, saveRules])
 
   const updateRule = useCallback((id: string, updates: Partial<CycleRule>) => {
-    const list = rules.map(r => r.id === id ? { ...r, ...updates } : r)
-    saveRules(list)
+    saveRules(rules.map(r => r.id === id ? { ...r, ...updates } : r))
   }, [rules, saveRules])
 
   const deleteRule = useCallback((id: string) => {
@@ -225,8 +267,7 @@ export function useStore() {
   }, [schedules, saveSchedules])
 
   const updateSchedule = useCallback((id: string, updates: Partial<Schedule>) => {
-    const list = schedules.map(s => s.id === id ? { ...s, ...updates, isException: true } : s)
-    saveSchedules(list)
+    saveSchedules(schedules.map(s => s.id === id ? { ...s, ...updates, isException: true } : s))
   }, [schedules, saveSchedules])
 
   const deleteSchedule = useCallback((id: string) => {
@@ -235,26 +276,29 @@ export function useStore() {
 
   const getOrCreateDonor = useCallback((donorInfo: Omit<Donor, 'id' | 'createTime'>) => {
     let donor = donors.find(d => d.idCard === donorInfo.idCard)
+    let result: Donor
     if (donor) {
       if (donor.name !== donorInfo.name || donor.phone !== donorInfo.phone || donor.bloodType !== donorInfo.bloodType) {
         const updated = { ...donor, ...donorInfo }
         saveDonors(donors.map(d => d.id === donor.id ? updated : d))
-        return updated
+        result = updated
+      } else {
+        result = donor
       }
-      return donor
+    } else {
+      const newDonor: Donor = {
+        ...donorInfo,
+        id: generateId(),
+        createTime: formatDateTime(new Date())
+      }
+      saveDonors([...donors, newDonor])
+      result = newDonor
     }
-    const newDonor: Donor = {
-      ...donorInfo,
-      id: generateId(),
-      createTime: formatDateTime(new Date())
-    }
-    saveDonors([...donors, newDonor])
-    return newDonor
+    return result
   }, [donors, saveDonors])
 
   const updateDonor = useCallback((id: string, updates: Partial<Donor>) => {
-    const list = donors.map(d => d.id === id ? { ...d, ...updates } : d)
-    saveDonors(list)
+    saveDonors(donors.map(d => d.id === id ? { ...d, ...updates } : d))
   }, [donors, saveDonors])
 
   const addQueueItem = useCallback((item: Omit<QueueItem, 'id' | 'queueNumber' | 'status' | 'missedCount' | 'createTime' | 'updateTime'>) => {
@@ -277,10 +321,9 @@ export function useStore() {
   }, [queues, saveQueues])
 
   const updateQueueItem = useCallback((id: string, updates: Partial<QueueItem>) => {
-    const list = queues.map(q =>
+    saveQueues(queues.map(q =>
       q.id === id ? { ...q, ...updates, updateTime: formatDateTime(new Date()) } : q
-    )
-    saveQueues(list)
+    ))
   }, [queues, saveQueues])
 
   const callNextNumber = useCallback((scheduleId: string) => {
@@ -291,12 +334,10 @@ export function useStore() {
     if (waiting.length === 0) return null
 
     const next = waiting[0]
-    updateQueueItem(next.id, {
-      status: 'called',
-      callTime: formatDateTime(new Date())
-    })
-    return { ...next, status: 'called' as const, callTime: formatDateTime(new Date()) }
-  }, [queues, updateQueueItem])
+    const updated = { ...next, status: 'called' as const, callTime: formatDateTime(new Date()) }
+    saveQueues(queues.map(q => q.id === next.id ? { ...q, ...updated } : q))
+    return updated
+  }, [queues, saveQueues])
 
   const markMissed = useCallback((id: string) => {
     const item = queues.find(q => q.id === id)
@@ -305,10 +346,7 @@ export function useStore() {
     const newMissedCount = item.missedCount + 1
 
     if (newMissedCount >= 3) {
-      updateQueueItem(id, {
-        status: 'cancelled',
-        missedCount: newMissedCount
-      })
+      updateQueueItem(id, { status: 'cancelled', missedCount: newMissedCount })
     } else {
       const scheduleQueues = queues
         .filter(q => q.scheduleId === item.scheduleId && q.status !== 'cancelled')
@@ -336,7 +374,7 @@ export function useStore() {
     }
   }, [queues, donors, updateQueueItem, updateDonor])
 
-  return {
+  const value = useMemo<StoreContextValue>(() => ({
     sites,
     rules,
     schedules,
@@ -359,5 +397,28 @@ export function useStore() {
     callNextNumber,
     markMissed,
     completeDonation,
+    forceRehydrate: rehydrate,
+  }), [
+    sites, rules, schedules, donors, queues,
+    addSite, updateSite, deleteSite,
+    addRule, updateRule, deleteRule,
+    batchGenerateSchedules, addSchedule, updateSchedule, deleteSchedule,
+    getOrCreateDonor, updateDonor,
+    addQueueItem, updateQueueItem, callNextNumber, markMissed, completeDonation,
+    rehydrate
+  ])
+
+  return (
+    <StoreContext.Provider value={value}>
+      {children}
+    </StoreContext.Provider>
+  )
+}
+
+export function useStore(): StoreContextValue {
+  const ctx = useContext(StoreContext)
+  if (!ctx) {
+    throw new Error('useStore must be used within a StoreProvider')
   }
+  return ctx
 }
