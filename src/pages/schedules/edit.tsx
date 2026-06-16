@@ -26,6 +26,8 @@ export default function SchedulesEdit() {
   const [startTime, setStartTime] = useState('09:00')
   const [endTime, setEndTime] = useState('16:00')
   const [stations, setStations] = useState('2')
+  const [slotIntervalMin, setSlotIntervalMin] = useState('60')
+  const [capacityPerSlot, setCapacityPerSlot] = useState('10')
   const [exceptionReason, setExceptionReason] = useState('')
   const [errors, setErrors] = useState<Record<string, string>>({})
 
@@ -47,6 +49,8 @@ export default function SchedulesEdit() {
         setStartTime(schedule.startTime)
         setEndTime(schedule.endTime)
         setStations(String(schedule.stations))
+        setSlotIntervalMin(String(schedule.slotIntervalMin || 60))
+        setCapacityPerSlot(String(schedule.capacityPerSlot || 10))
         setExceptionReason(schedule.exceptionReason || '')
       }
     } else if (sites.length > 0) {
@@ -76,6 +80,14 @@ export default function SchedulesEdit() {
     if (isNaN(stationsNum) || stationsNum < 1 || stationsNum > 50) {
       newErrors.stations = '请输入1-50之间的数字'
     }
+    const interval = parseInt(slotIntervalMin)
+    if (isNaN(interval) || interval < 15 || interval > 180) {
+      newErrors.slotIntervalMin = '请输入15-180分钟之间的间隔'
+    }
+    const cap = parseInt(capacityPerSlot)
+    if (isNaN(cap) || cap < 1 || cap > 200) {
+      newErrors.capacityPerSlot = '请输入1-200之间的数字'
+    }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -99,6 +111,8 @@ export default function SchedulesEdit() {
       startTime,
       endTime,
       stations: parseInt(stations),
+      slotIntervalMin: parseInt(slotIntervalMin),
+      capacityPerSlot: parseInt(capacityPerSlot),
       isException: true,
       exceptionReason: exceptionReason.trim() || undefined
     }
@@ -202,6 +216,33 @@ export default function SchedulesEdit() {
               maxlength={2}
             />
             {errors.stations && <Text className='form-item-error'>{errors.stations}</Text>}
+          </View>
+
+          <View className='form-row'>
+            <View className='form-item form-item-half'>
+              <Text className='form-item-label form-item-label-required'>时段间隔(分钟)</Text>
+              <Input
+                className='form-item-input'
+                type='number'
+                placeholder='如 60'
+                value={slotIntervalMin}
+                onInput={e => setSlotIntervalMin(e.detail.value.replace(/[^0-9]/g, ''))}
+                maxlength={3}
+              />
+              {errors.slotIntervalMin && <Text className='form-item-error'>{errors.slotIntervalMin}</Text>}
+            </View>
+            <View className='form-item form-item-half'>
+              <Text className='form-item-label form-item-label-required'>每时段容量</Text>
+              <Input
+                className='form-item-input'
+                type='number'
+                placeholder='每时段可预约人数'
+                value={capacityPerSlot}
+                onInput={e => setCapacityPerSlot(e.detail.value.replace(/[^0-9]/g, ''))}
+                maxlength={3}
+              />
+              {errors.capacityPerSlot && <Text className='form-item-error'>{errors.capacityPerSlot}</Text>}
+            </View>
           </View>
 
           {isEdit && (

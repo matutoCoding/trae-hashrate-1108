@@ -28,6 +28,8 @@ export interface Schedule {
   startTime: string
   endTime: string
   stations: number
+  slotIntervalMin: number
+  capacityPerSlot: number
   isException: boolean
   exceptionReason?: string
   createTime: string
@@ -49,6 +51,7 @@ export interface QueueItem {
   donorId: string
   donorName: string
   queueNumber: number
+  timeSlot: string
   status: 'waiting' | 'called' | 'processing' | 'completed' | 'missed' | 'cancelled'
   missedCount: number
   callTime?: string

@@ -100,7 +100,7 @@ export function padZero(num: number): string {
   return num.toString().padStart(2, '0')
 }
 
-export function getTimeSlots(startTime: string, endTime: string, intervalMin = 30): string[] {
+export function getTimeSlots(startTime: string, endTime: string, intervalMin = 60): string[] {
   const slots: string[] = []
   const [sh, sm] = startTime.split(':').map(Number)
   const [eh, em] = endTime.split(':').map(Number)
@@ -112,4 +112,30 @@ export function getTimeSlots(startTime: string, endTime: string, intervalMin = 3
     slots.push(`${padZero(h)}:${padZero(min)}`)
   }
   return slots
+}
+
+export function getSlotEndTime(slotStart: string, intervalMin = 60): string {
+  const [h, m] = slotStart.split(':').map(Number)
+  const totalMin = h * 60 + m + intervalMin
+  const eh = Math.floor(totalMin / 60)
+  const em = totalMin % 60
+  return `${padZero(eh)}:${padZero(em)}`
+}
+
+export function formatSlotRange(slotStart: string, intervalMin = 60): string {
+  return `${slotStart}-${getSlotEndTime(slotStart, intervalMin)}`
+}
+
+export function getWeekRange(baseDate: Date | string = new Date()): { start: string; end: string; days: string[] } {
+  const base = dayjs(baseDate)
+  const start = base.startOf('week')
+  const days: string[] = []
+  for (let i = 0; i < 7; i++) {
+    days.push(start.add(i, 'day').format('YYYY-MM-DD'))
+  }
+  return {
+    start: days[0],
+    end: days[6],
+    days
+  }
 }

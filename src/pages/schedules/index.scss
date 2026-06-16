@@ -190,3 +190,30 @@
   color: #9CA3AF;
   margin-top: 8px;
 }
+
+.view-switch {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  background: #FFFFFF;
+  border-radius: 14px;
+  padding: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.view-switch-item {
+  flex: 1;
+  text-align: center;
+  padding: 18px 0;
+  font-size: 28px;
+  color: #6B7280;
+  border-radius: 10px;
+  font-weight: 500;
+  transition: all 0.2s;
+
+  &-active {
+    background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%);
+    color: #FFFFFF;
+    font-weight: 600;
+  }
+}

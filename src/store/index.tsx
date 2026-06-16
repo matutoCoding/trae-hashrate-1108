@@ -15,7 +15,13 @@ import {
   Donor,
   QueueItem,
 } from '@/types'
-import { generateId, formatDateTime, generateSchedulesByRule } from '@/utils'
+import {
+  generateId,
+  formatDateTime,
+  generateSchedulesByRule,
+  getTimeSlots,
+  isSameDay
+} from '@/utils'
 
 const STORAGE_KEYS = {
   sites: 'bd_sites',
@@ -39,6 +45,29 @@ function setStorage<T>(key: string, data: T) {
     Taro.setStorageSync(key, data)
   } catch (e) {
     console.error('Storage error:', e)
+  }
+}
+
+const DEFAULT_SLOT_INTERVAL = 60
+const DEFAULT_CAPACITY_PER_SLOT = 10
+
+function migrateSchedule(s: Schedule): Schedule {
+  return {
+    slotIntervalMin: DEFAULT_SLOT_INTERVAL,
+    capacityPerSlot: DEFAULT_CAPACITY_PER_SLOT,
+    ...s
+  }
+}
+
+function migrateQueueItem(q: QueueItem, schedules: Schedule[]): QueueItem {
+  if (q.timeSlot) return q
+  const schedule = schedules.find(s => s.id === q.scheduleId)
+  const slots = schedule
+    ? getTimeSlots(schedule.startTime, schedule.endTime, schedule.slotIntervalMin || DEFAULT_SLOT_INTERVAL)
+    : []
+  return {
+    timeSlot: slots[0] || '09:00',
+    ...q
   }
 }
 
@@ -107,6 +136,13 @@ function initDemoData() {
   }
 }
 
+export interface DuplicateCheckResult {
+  duplicate: boolean
+  type: 'none' | 'same_schedule' | 'same_day_other_schedule'
+  message: string
+  existing?: QueueItem
+}
+
 export interface StoreContextValue {
   sites: DonationSite[]
   rules: CycleRule[]
@@ -125,12 +161,17 @@ export interface StoreContextValue {
   deleteSchedule: (id: string) => void
   getOrCreateDonor: (donorInfo: Omit<Donor, 'id' | 'createTime'>) => Donor
   updateDonor: (id: string, updates: Partial<Donor>) => void
-  addQueueItem: (item: Omit<QueueItem, 'id' | 'queueNumber' | 'status' | 'missedCount' | 'createTime' | 'updateTime'>) => QueueItem
+  addQueueItem: (
+    item: Omit<QueueItem, 'id' | 'queueNumber' | 'status' | 'missedCount' | 'createTime' | 'updateTime'>
+  ) => { ok: boolean; message?: string; data?: QueueItem }
   updateQueueItem: (id: string, updates: Partial<QueueItem>) => void
-  callNextNumber: (scheduleId: string) => QueueItem | null
+  callNextNumber: (scheduleId: string, timeSlot?: string) => QueueItem | null
   markMissed: (id: string) => void
   completeDonation: (id: string) => void
   forceRehydrate: () => void
+  getSlotQueueCount: (scheduleId: string, timeSlot: string) => number
+  getAvailableSlots: (scheduleId: string) => { slot: string; used: number; capacity: number; full: boolean }[]
+  checkDuplicateDonor: (idCard: string, scheduleId: string) => DuplicateCheckResult
 }
 
 const StoreContext = createContext<StoreContextValue | null>(null)
@@ -145,11 +186,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const rehydrate = useCallback(() => {
     initDemoData()
-    setSites(getStorage<DonationSite[]>(STORAGE_KEYS.sites, []))
-    setRules(getStorage<CycleRule[]>(STORAGE_KEYS.rules, []))
-    setSchedules(getStorage<Schedule[]>(STORAGE_KEYS.schedules, []))
-    setDonors(getStorage<Donor[]>(STORAGE_KEYS.donors, []))
-    setQueues(getStorage<QueueItem[]>(STORAGE_KEYS.queues, []))
+    const rawSites = getStorage<DonationSite[]>(STORAGE_KEYS.sites, [])
+    const rawRules = getStorage<CycleRule[]>(STORAGE_KEYS.rules, [])
+    const rawSchedules = getStorage<Schedule[]>(STORAGE_KEYS.schedules, []).map(migrateSchedule)
+    const rawDonors = getStorage<Donor[]>(STORAGE_KEYS.donors, [])
+    const rawQueues = getStorage<QueueItem[]>(STORAGE_KEYS.queues, []).map(q => migrateQueueItem(q, rawSchedules))
+
+    setSites(rawSites)
+    setRules(rawRules)
+    setSchedules(rawSchedules)
+    setDonors(rawDonors)
+    setQueues(rawQueues)
     rehydrateCount.current++
   }, [])
 
@@ -168,8 +215,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [])
 
   const saveSchedules = useCallback((list: Schedule[]) => {
-    setSchedules(list)
-    setStorage(STORAGE_KEYS.schedules, list)
+    const normalized = list.map(migrateSchedule)
+    setSchedules(normalized)
+    setStorage(STORAGE_KEYS.schedules, normalized)
   }, [])
 
   const saveDonors = useCallback((list: Donor[]) => {
@@ -227,7 +275,7 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const site = sites.find(s => s.id === rule.siteId)
     if (!site) return []
 
-    const generated = generateSchedulesByRule({
+    const rawGenerated = generateSchedulesByRule({
       id: rule.id,
       siteId: rule.siteId,
       siteName: rule.siteName,
@@ -238,6 +286,12 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       startDate: rule.startDate,
       endDate: rule.endDate
     })
+
+    const generated: Schedule[] = rawGenerated.map(s => ({
+      ...s,
+      slotIntervalMin: DEFAULT_SLOT_INTERVAL,
+      capacityPerSlot: rule.capacityPerHour || DEFAULT_CAPACITY_PER_SLOT
+    }))
 
     const existingKeys = new Set(
       schedules
@@ -257,17 +311,17 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [rules, sites, schedules, saveSchedules])
 
   const addSchedule = useCallback((schedule: Omit<Schedule, 'id' | 'createTime'>) => {
-    const newSchedule: Schedule = {
+    const newSchedule: Schedule = migrateSchedule({
       ...schedule,
       id: generateId(),
       createTime: formatDateTime(new Date())
-    }
+    } as Schedule)
     saveSchedules([...schedules, newSchedule])
     return newSchedule
   }, [schedules, saveSchedules])
 
   const updateSchedule = useCallback((id: string, updates: Partial<Schedule>) => {
-    saveSchedules(schedules.map(s => s.id === id ? { ...s, ...updates, isException: true } : s))
+    saveSchedules(schedules.map(s => s.id === id ? migrateSchedule({ ...s, ...updates, isException: true } as Schedule) : s))
   }, [schedules, saveSchedules])
 
   const deleteSchedule = useCallback((id: string) => {
@@ -301,7 +355,88 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     saveDonors(donors.map(d => d.id === id ? { ...d, ...updates } : d))
   }, [donors, saveDonors])
 
-  const addQueueItem = useCallback((item: Omit<QueueItem, 'id' | 'queueNumber' | 'status' | 'missedCount' | 'createTime' | 'updateTime'>) => {
+  const getSlotQueueCount = useCallback((scheduleId: string, timeSlot: string) => {
+    return queues.filter(
+      q => q.scheduleId === scheduleId && q.timeSlot === timeSlot && q.status !== 'cancelled'
+    ).length
+  }, [queues])
+
+  const getAvailableSlots = useCallback((scheduleId: string) => {
+    const schedule = schedules.find(s => s.id === scheduleId)
+    if (!schedule) return []
+    const interval = schedule.slotIntervalMin || DEFAULT_SLOT_INTERVAL
+    const capacity = schedule.capacityPerSlot || DEFAULT_CAPACITY_PER_SLOT
+    const slots = getTimeSlots(schedule.startTime, schedule.endTime, interval)
+    return slots.map(slot => {
+      const used = getSlotQueueCount(scheduleId, slot)
+      return { slot, used, capacity, full: used >= capacity }
+    })
+  }, [schedules, getSlotQueueCount])
+
+  const checkDuplicateDonor = useCallback((idCard: string, scheduleId: string): DuplicateCheckResult => {
+    const donor = donors.find(d => d.idCard === idCard)
+    if (!donor) return { duplicate: false, type: 'none', message: '' }
+
+    const targetSchedule = schedules.find(s => s.id === scheduleId)
+    if (!targetSchedule) return { duplicate: false, type: 'none', message: '' }
+
+    const activeQueues = queues.filter(q =>
+      q.donorId === donor.id && q.status !== 'completed' && q.status !== 'cancelled'
+    )
+
+    const sameSchedule = activeQueues.find(q => q.scheduleId === scheduleId)
+    if (sameSchedule) {
+      return {
+        duplicate: true,
+        type: 'same_schedule',
+        message: `该身份证已在本排班取号（${sameSchedule.timeSlot} 时段，号码 ${sameSchedule.queueNumber}），请勿重复登记`,
+        existing: sameSchedule
+      }
+    }
+
+    const sameDayOther = activeQueues.find(q => {
+      const sch = schedules.find(s => s.id === q.scheduleId)
+      return sch && isSameDay(sch.date, targetSchedule.date)
+    })
+    if (sameDayOther) {
+      const sch = schedules.find(s => s.id === sameDayOther.scheduleId)
+      return {
+        duplicate: true,
+        type: 'same_day_other_schedule',
+        message: `该身份证今日已在「${sch?.siteName || ''}」取号（${sameDayOther.timeSlot} 时段，号码 ${sameDayOther.queueNumber}），如需更换采血点请先取消原预约`,
+        existing: sameDayOther
+      }
+    }
+
+    return { duplicate: false, type: 'none', message: '' }
+  }, [donors, queues, schedules])
+
+  const addQueueItem = useCallback((
+    item: Omit<QueueItem, 'id' | 'queueNumber' | 'status' | 'missedCount' | 'createTime' | 'updateTime'>
+  ): { ok: boolean; message?: string; data?: QueueItem } => {
+    const schedule = schedules.find(s => s.id === item.scheduleId)
+    if (!schedule) {
+      return { ok: false, message: '排班不存在' }
+    }
+
+    if (!item.timeSlot) {
+      return { ok: false, message: '请选择预约时段' }
+    }
+
+    const capacity = schedule.capacityPerSlot || DEFAULT_CAPACITY_PER_SLOT
+    const currentCount = getSlotQueueCount(item.scheduleId, item.timeSlot)
+    if (currentCount >= capacity) {
+      return { ok: false, message: `该时段（${item.timeSlot}）预约已满，请选择其他时段` }
+    }
+
+    const donor = donors.find(d => d.id === item.donorId)
+    if (donor) {
+      const dup = checkDuplicateDonor(donor.idCard, item.scheduleId)
+      if (dup.duplicate) {
+        return { ok: false, message: dup.message }
+      }
+    }
+
     const scheduleQueues = queues
       .filter(q => q.scheduleId === item.scheduleId && q.status !== 'cancelled')
       .sort((a, b) => b.queueNumber - a.queueNumber)
@@ -317,8 +452,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       updateTime: formatDateTime(new Date())
     }
     saveQueues([...queues, newItem])
-    return newItem
-  }, [queues, saveQueues])
+    return { ok: true, data: newItem }
+  }, [queues, schedules, donors, getSlotQueueCount, checkDuplicateDonor, saveQueues])
 
   const updateQueueItem = useCallback((id: string, updates: Partial<QueueItem>) => {
     saveQueues(queues.map(q =>
@@ -326,10 +461,13 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     ))
   }, [queues, saveQueues])
 
-  const callNextNumber = useCallback((scheduleId: string) => {
-    const waiting = queues
+  const callNextNumber = useCallback((scheduleId: string, timeSlot?: string) => {
+    let waiting = queues
       .filter(q => q.scheduleId === scheduleId && q.status === 'waiting')
-      .sort((a, b) => a.queueNumber - b.queueNumber)
+    if (timeSlot) {
+      waiting = waiting.filter(q => q.timeSlot === timeSlot)
+    }
+    waiting = waiting.sort((a, b) => a.queueNumber - b.queueNumber)
 
     if (waiting.length === 0) return null
 
@@ -398,6 +536,9 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     markMissed,
     completeDonation,
     forceRehydrate: rehydrate,
+    getSlotQueueCount,
+    getAvailableSlots,
+    checkDuplicateDonor,
   }), [
     sites, rules, schedules, donors, queues,
     addSite, updateSite, deleteSite,
@@ -405,7 +546,8 @@ export const StoreProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     batchGenerateSchedules, addSchedule, updateSchedule, deleteSchedule,
     getOrCreateDonor, updateDonor,
     addQueueItem, updateQueueItem, callNextNumber, markMissed, completeDonation,
-    rehydrate
+    rehydrate,
+    getSlotQueueCount, getAvailableSlots, checkDuplicateDonor,
   ])
 
   return (

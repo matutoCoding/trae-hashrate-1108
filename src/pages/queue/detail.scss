@@ -265,3 +265,185 @@
   padding: 16px 20px;
   margin-bottom: 8px;
 }
+
+.schedule-info-sub {
+  font-size: 22px;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+
+.slot-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.slot-filter-item {
+  padding: 10px 22px;
+  background: #F3F4F6;
+  border-radius: 20px;
+  font-size: 24px;
+  color: #374151;
+  transition: all 0.2s;
+
+  &-active {
+    background: linear-gradient(135deg, #DC2626 0%, #B91C1C 100%);
+    color: #FFFFFF;
+    font-weight: 500;
+  }
+}
+
+.slot-stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.slot-stat-card {
+  background: #F9FAFB;
+  border-radius: 14px;
+  padding: 18px;
+  border: 2px solid #F3F4F6;
+
+  &-full {
+    background: #FEF2F2;
+    border-color: #FECACA;
+  }
+}
+
+.slot-stat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.slot-stat-time {
+  font-size: 26px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.slot-stat-badge {
+  font-size: 22px;
+  font-weight: 600;
+  padding: 4px 14px;
+  border-radius: 12px;
+
+  &.badge-ok {
+    background: #D1FAE5;
+    color: #065F46;
+  }
+
+  &.badge-full {
+    background: #FEE2E2;
+    color: #991B1B;
+  }
+}
+
+.slot-stat-body {
+  display: flex;
+  gap: 12px;
+}
+
+.slot-stat-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #FFFFFF;
+  border-radius: 10px;
+  padding: 12px 4px;
+}
+
+.slot-stat-num {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.slot-stat-label {
+  font-size: 20px;
+  color: #6B7280;
+  margin-top: 4px;
+}
+
+.calling-sub {
+  font-size: 24px;
+  opacity: 0.9;
+  margin-bottom: 20px;
+}
+
+.slot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.slot-card {
+  background: #F9FAFB;
+  border: 2px solid #E5E7EB;
+  border-radius: 14px;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+
+  &-active {
+    background: #FEF2F2;
+    border-color: #DC2626;
+  }
+
+  &-disabled {
+    opacity: 0.55;
+    background: #F3F4F6;
+  }
+}
+
+.slot-card-time {
+  font-size: 28px;
+  font-weight: 600;
+  color: #111827;
+}
+
+.slot-card-count {
+  font-size: 22px;
+  padding: 4px 14px;
+  border-radius: 10px;
+
+  &.count-ok {
+    background: #D1FAE5;
+    color: #065F46;
+  }
+
+  &.count-full {
+    background: #FEE2E2;
+    color: #991B1B;
+  }
+}
+
+.duplicate-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: #FFFBEB;
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 10px;
+  border: 1px solid #FDE68A;
+}
+
+.duplicate-warn-icon {
+  font-size: 28px;
+  flex-shrink: 0;
+}
+
+.duplicate-warn-text {
+  font-size: 24px;
+  color: #92400E;
+  line-height: 1.5;
+  flex: 1;
+}

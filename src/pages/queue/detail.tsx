@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { View, Text, ScrollView, Input, Picker, Textarea } from '@tarojs/components'
 import Taro, { useRouter } from '@tarojs/taro'
 import { useStore } from '@/store'
@@ -9,7 +9,12 @@ import {
   QUEUE_STATUS_COLORS,
   WEEK_DAY_LABELS
 } from '@/types'
-import { validateIdCard, validatePhone, validateDonationInterval } from '@/utils'
+import {
+  validateIdCard,
+  validatePhone,
+  validateDonationInterval,
+  formatSlotRange
+} from '@/utils'
 import './detail.scss'
 
 export default function QueueDetail() {
@@ -25,20 +30,54 @@ export default function QueueDetail() {
     updateQueueItem,
     callNextNumber,
     markMissed,
-    completeDonation
+    completeDonation,
+    getAvailableSlots,
+    checkDuplicateDonor
   } = useStore()
 
   const [tab, setTab] = useState<'queue' | 'register'>('queue')
+  const [callSlotFilter, setCallSlotFilter] = useState<string>('all')
 
   const [donorName, setDonorName] = useState('')
   const [donorIdCard, setDonorIdCard] = useState('')
   const [donorPhone, setDonorPhone] = useState('')
   const [donorBloodType, setDonorBloodType] = useState<string>('unknown')
+  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('')
   const [registerErrors, setRegisterErrors] = useState<Record<string, string>>({})
+  const [duplicateHint, setDuplicateHint] = useState<{ show: boolean; message: string }>({ show: false, message: '' })
 
   const schedule = useMemo(() => {
     return schedules.find(s => s.id === scheduleId)
   }, [schedules, scheduleId])
+
+  const slotInterval = schedule?.slotIntervalMin || 60
+  const availableSlots = useMemo(() => {
+    return scheduleId ? getAvailableSlots(scheduleId) : []
+  }, [scheduleId, getAvailableSlots])
+
+  useEffect(() => {
+    if (availableSlots.length > 0 && !selectedTimeSlot) {
+      const firstAvailable = availableSlots.find(s => !s.full)
+      if (firstAvailable) setSelectedTimeSlot(firstAvailable.slot)
+    }
+  }, [availableSlots, selectedTimeSlot])
+
+  useEffect(() => {
+    if (!donorIdCard.trim() || !scheduleId) {
+      setDuplicateHint({ show: false, message: '' })
+      return
+    }
+    if (!validateIdCard(donorIdCard.trim())) {
+      setDuplicateHint({ show: false, message: '' })
+      return
+    }
+    const result = checkDuplicateDonor(donorIdCard.trim(), scheduleId)
+    if (result.duplicate) {
+      setDuplicateHint({ show: true, message: result.message })
+    } else {
+      setDuplicateHint({ show: false, message: '' })
+    }
+  }, [donorIdCard, scheduleId, checkDuplicateDonor])
 
   const scheduleQueues = useMemo(() => {
     return queues
@@ -50,12 +89,32 @@ export default function QueueDetail() {
       })
   }, [queues, scheduleId])
 
-  const waitingList = useMemo(() =>
-    scheduleQueues
-      .filter(q => q.status === 'waiting')
-      .sort((a, b) => a.queueNumber - b.queueNumber),
-    [scheduleQueues]
-  )
+  const slotsStats = useMemo(() => {
+    const stats: Record<string, { waiting: number; called: number; processing: number; completed: number; missed: number; cancelled: number; total: number }> = {}
+    for (const s of availableSlots) {
+      stats[s.slot] = { waiting: 0, called: 0, processing: 0, completed: 0, missed: 0, cancelled: 0, total: s.capacity }
+    }
+    for (const q of scheduleQueues) {
+      if (!stats[q.timeSlot]) {
+        stats[q.timeSlot] = { waiting: 0, called: 0, processing: 0, completed: 0, missed: 0, cancelled: 0, total: 10 }
+      }
+      if (q.status === 'waiting') stats[q.timeSlot].waiting++
+      else if (q.status === 'called') stats[q.timeSlot].called++
+      else if (q.status === 'processing') stats[q.timeSlot].processing++
+      else if (q.status === 'completed') stats[q.timeSlot].completed++
+      else if (q.status === 'missed') stats[q.timeSlot].missed++
+      else if (q.status === 'cancelled') stats[q.timeSlot].cancelled++
+    }
+    return stats
+  }, [scheduleQueues, availableSlots])
+
+  const waitingList = useMemo(() => {
+    let list = scheduleQueues.filter(q => q.status === 'waiting')
+    if (callSlotFilter !== 'all') {
+      list = list.filter(q => q.timeSlot === callSlotFilter)
+    }
+    return list.sort((a, b) => a.queueNumber - b.queueNumber)
+  }, [scheduleQueues, callSlotFilter])
 
   const activeList = useMemo(() =>
     scheduleQueues.filter(q => q.status === 'called' || q.status === 'processing'),
@@ -96,6 +155,7 @@ export default function QueueDetail() {
     } else if (!validatePhone(donorPhone.trim())) {
       errors.phone = '手机号格式不正确'
     }
+    if (!selectedTimeSlot) errors.timeSlot = '请选择预约时段'
     setRegisterErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -123,6 +183,16 @@ export default function QueueDetail() {
       return
     }
 
+    if (duplicateHint.show) {
+      Taro.showModal({
+        title: '重复取号提醒',
+        content: duplicateHint.message,
+        showCancel: false,
+        confirmColor: '#F59E0B'
+      })
+      return
+    }
+
     const donor = getOrCreateDonor({
       name: donorName.trim(),
       idCard: donorIdCard.trim(),
@@ -131,15 +201,28 @@ export default function QueueDetail() {
       lastDonationDate: existingDonor?.lastDonationDate
     })
 
-    const item = addQueueItem({
+    const result = addQueueItem({
       scheduleId: schedule.id,
       donorId: donor.id,
-      donorName: donor.name
+      donorName: donor.name,
+      timeSlot: selectedTimeSlot
     })
+
+    if (!result.ok) {
+      Taro.showModal({
+        title: '取号失败',
+        content: result.message || '请稍后重试',
+        showCancel: false,
+        confirmColor: '#DC2626'
+      })
+      return
+    }
+
+    const item = result.data!
 
     Taro.showModal({
       title: '取号成功',
-      content: `${donor.name}，您的排队号是：A${String(item.queueNumber).padStart(3, '0')}\n前方还有 ${item.queueNumber - 1} 人等候`,
+      content: `${donor.name}，您的排队号是：A${String(item.queueNumber).padStart(3, '0')}\n预约时段：${formatSlotRange(item.timeSlot, slotInterval)}\n前方还有 ${item.queueNumber - 1} 人等候`,
       showCancel: false,
       confirmText: '好的'
     })
@@ -148,19 +231,21 @@ export default function QueueDetail() {
     setDonorIdCard('')
     setDonorPhone('')
     setDonorBloodType('unknown')
+    setSelectedTimeSlot('')
     setRegisterErrors({})
+    setDuplicateHint({ show: false, message: '' })
     setTab('queue')
   }
 
   const handleCallNext = () => {
-    const called = callNextNumber(scheduleId)
+    const called = callNextNumber(scheduleId, callSlotFilter === 'all' ? undefined : callSlotFilter)
     if (!called) {
       Taro.showToast({ title: '暂无等待中的献血者', icon: 'none' })
       return
     }
     Taro.vibrateLong({})
     Taro.showToast({
-      title: `请 A${String(called.queueNumber).padStart(3, '0')} 号`,
+      title: `请 A${String(called.queueNumber).padStart(3, '0')} 号（${called.timeSlot}时段）`,
       icon: 'none',
       duration: 2000
     })
@@ -240,6 +325,9 @@ export default function QueueDetail() {
           <Text className='schedule-info-date'>
             {schedule.date} {getWeekDay(schedule.date)} · {schedule.startTime}-{schedule.endTime}
           </Text>
+          <Text className='schedule-info-sub'>
+            {schedule.stations}采血位 · 每{slotInterval}分钟{schedule.capacityPerSlot || 10}人
+          </Text>
         </View>
         <View className='schedule-info-stations'>
           <Text className='stations-num'>{schedule.stations}</Text>
@@ -270,11 +358,67 @@ export default function QueueDetail() {
       {tab === 'queue' ? (
         <>
           <View className='container'>
+            {availableSlots.length > 0 && (
+              <View className='card'>
+                <View className='card-title'>
+                  <Text>分时段运营统计</Text>
+                </View>
+                <View className='slot-filter-row'>
+                  <View
+                    key='all'
+                    className={`slot-filter-item ${callSlotFilter === 'all' ? 'slot-filter-item-active' : ''}`}
+                    onClick={() => setCallSlotFilter('all')}
+                  >
+                    全部时段
+                  </View>
+                  {availableSlots.map(s => (
+                    <View
+                      key={s.slot}
+                      className={`slot-filter-item ${callSlotFilter === s.slot ? 'slot-filter-item-active' : ''}`}
+                      onClick={() => setCallSlotFilter(s.slot)}
+                    >
+                      {s.slot}
+                    </View>
+                  ))}
+                </View>
+                <View className='slot-stats-grid'>
+                  {availableSlots.map(s => {
+                    const stat = slotsStats[s.slot] || { waiting: 0, called: 0, processing: 0, completed: 0, total: s.capacity }
+                    return (
+                      <View key={s.slot} className={`slot-stat-card ${s.full ? 'slot-stat-card-full' : ''}`}>
+                        <View className='slot-stat-head'>
+                          <Text className='slot-stat-time'>{formatSlotRange(s.slot, slotInterval)}</Text>
+                          <View className={`slot-stat-badge ${s.full ? 'badge-full' : 'badge-ok'}`}>
+                            {s.used}/{s.capacity}
+                          </View>
+                        </View>
+                        <View className='slot-stat-body'>
+                          <View className='slot-stat-item'>
+                            <Text className='slot-stat-num' style={{ color: QUEUE_STATUS_COLORS.waiting }}>{stat.waiting}</Text>
+                            <Text className='slot-stat-label'>等待</Text>
+                          </View>
+                          <View className='slot-stat-item'>
+                            <Text className='slot-stat-num' style={{ color: QUEUE_STATUS_COLORS.processing }}>{stat.processing + stat.called}</Text>
+                            <Text className='slot-stat-label'>采集中</Text>
+                          </View>
+                          <View className='slot-stat-item'>
+                            <Text className='slot-stat-num' style={{ color: QUEUE_STATUS_COLORS.completed }}>{stat.completed}</Text>
+                            <Text className='slot-stat-label'>已完成</Text>
+                          </View>
+                        </View>
+                      </View>
+                    )
+                  })}
+                </View>
+              </View>
+            )}
+
             {currentCalled && (
               <View className='calling-card'>
                 <View className='calling-label'>当前叫号</View>
                 <View className='calling-number'>A{String(currentCalled.queueNumber).padStart(3, '0')}</View>
                 <View className='calling-name'>{currentCalled.donorName}</View>
+                <View className='calling-sub'>时段 {formatSlotRange(currentCalled.timeSlot, slotInterval)}</View>
                 <View className='calling-actions'>
                   <View
                     className='btn btn-warning btn-sm'
@@ -305,8 +449,13 @@ export default function QueueDetail() {
                       </View>
                       <View className='queue-item-info'>
                         <Text className='queue-item-name'>{q.donorName}</Text>
-                        <View className='queue-item-status' style={{ color: QUEUE_STATUS_COLORS[q.status] }}>
-                          {QUEUE_STATUS_LABELS[q.status]}
+                        <View className='queue-item-meta'>
+                          <Text className='tag tag-blue' style={{ marginRight: 8 }}>
+                            {formatSlotRange(q.timeSlot, slotInterval)}
+                          </Text>
+                          <Text className='queue-item-status' style={{ color: QUEUE_STATUS_COLORS[q.status] }}>
+                            {QUEUE_STATUS_LABELS[q.status]}
+                          </Text>
                         </View>
                       </View>
                     </View>
@@ -326,8 +475,13 @@ export default function QueueDetail() {
                       </View>
                       <View className='queue-item-info'>
                         <Text className='queue-item-name'>{q.donorName}</Text>
-                        <View className='queue-item-status' style={{ color: QUEUE_STATUS_COLORS[q.status] }}>
-                          已叫号 · 等待到位
+                        <View className='queue-item-meta'>
+                          <Text className='tag tag-blue' style={{ marginRight: 8 }}>
+                            {formatSlotRange(q.timeSlot, slotInterval)}
+                          </Text>
+                          <Text className='queue-item-status' style={{ color: QUEUE_STATUS_COLORS[q.status] }}>
+                            已叫号 · 等待到位
+                          </Text>
                         </View>
                       </View>
                     </View>
@@ -352,7 +506,10 @@ export default function QueueDetail() {
 
             <View className='card'>
               <View className='card-title'>
-                <Text>等待队列 ({waitingList.length})</Text>
+                <Text>
+                  等待队列 ({waitingList.length})
+                  {callSlotFilter !== 'all' && ` · ${formatSlotRange(callSlotFilter, slotInterval)}`}
+                </Text>
                 <View
                   className='btn btn-primary btn-sm'
                   onClick={handleCallNext}
@@ -374,6 +531,9 @@ export default function QueueDetail() {
                       <View className='queue-item-info'>
                         <Text className='queue-item-name'>{q.donorName}</Text>
                         <View className='queue-item-meta'>
+                          <Text className='tag tag-blue' style={{ marginRight: 8 }}>
+                            {formatSlotRange(q.timeSlot, slotInterval)}
+                          </Text>
                           {q.missedCount > 0 && (
                             <Text className='tag tag-red' style={{ marginRight: 8 }}>
                               过号{q.missedCount}次
@@ -409,9 +569,14 @@ export default function QueueDetail() {
                       </View>
                       <View className='queue-item-info'>
                         <Text className='queue-item-name'>{q.donorName}</Text>
-                        <View className='queue-item-status' style={{ color: QUEUE_STATUS_COLORS[q.status] }}>
-                          {QUEUE_STATUS_LABELS[q.status]}
-                          {q.status === 'cancelled' && q.missedCount >= 3 && `（过号${q.missedCount}次作废）`}
+                        <View className='queue-item-meta'>
+                          <Text className='tag tag-gray' style={{ marginRight: 8 }}>
+                            {formatSlotRange(q.timeSlot, slotInterval)}
+                          </Text>
+                          <Text className='queue-item-status' style={{ color: QUEUE_STATUS_COLORS[q.status] }}>
+                            {QUEUE_STATUS_LABELS[q.status]}
+                            {q.status === 'cancelled' && q.missedCount >= 3 && `（过号${q.missedCount}次作废）`}
+                          </Text>
                         </View>
                       </View>
                     </View>
@@ -423,6 +588,33 @@ export default function QueueDetail() {
         </>
       ) : (
         <View className='container'>
+          <View className='card'>
+            <View className='card-title'>
+              <Text>选择预约时段</Text>
+            </View>
+            {availableSlots.length === 0 ? (
+              <View className='empty-small'>
+                <Text>当前排班未配置时段</Text>
+              </View>
+            ) : (
+              <View className='slot-grid'>
+                {availableSlots.map(s => (
+                  <View
+                    key={s.slot}
+                    className={`slot-card ${selectedTimeSlot === s.slot ? 'slot-card-active' : ''} ${s.full ? 'slot-card-disabled' : ''}`}
+                    onClick={() => !s.full && setSelectedTimeSlot(s.slot)}
+                  >
+                    <View className='slot-card-time'>{formatSlotRange(s.slot, slotInterval)}</View>
+                    <View className={`slot-card-count ${s.full ? 'count-full' : 'count-ok'}`}>
+                      {s.full ? `已满(${s.used}/${s.capacity})` : `剩余 ${s.capacity - s.used}/${s.capacity}`}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+            {registerErrors.timeSlot && <Text className='form-item-error'>{registerErrors.timeSlot}</Text>}
+          </View>
+
           <View className='card'>
             <View className='card-title'>
               <Text>献血者信息登记</Text>
@@ -450,6 +642,12 @@ export default function QueueDetail() {
                 maxlength={18}
               />
               {registerErrors.idCard && <Text className='form-item-error'>{registerErrors.idCard}</Text>}
+              {duplicateHint.show && (
+                <View className='duplicate-warn'>
+                  <Text className='duplicate-warn-icon'>⚠️</Text>
+                  <Text className='duplicate-warn-text'>{duplicateHint.message}</Text>
+                </View>
+              )}
             </View>
 
             <View className='form-item'>
@@ -483,7 +681,7 @@ export default function QueueDetail() {
             <View className='interval-notice'>
               <View className='interval-notice-icon'>ℹ️</View>
               <Text className='interval-notice-text'>
-                系统将自动校验身份证号，两次献血间隔需满180天
+                系统将自动校验身份证号，两次献血间隔需满180天；同一身份证当日不可重复取号
               </Text>
             </View>
           </View>
