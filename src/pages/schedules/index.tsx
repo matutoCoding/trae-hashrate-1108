@@ -1,17 +1,21 @@
 import { useState, useMemo } from 'react'
-import { View, Text, ScrollView, Picker } from '@tarojs/components'
+import { View, Text, ScrollView, Picker, Input } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import { useStore } from '@/store'
 import { formatDate, addDays, getWeekRange } from '@/utils'
-import { WEEK_DAY_LABELS } from '@/types'
+import { WEEK_DAY_LABELS, Schedule } from '@/types'
 import './index.scss'
 
 export default function SchedulesIndex() {
-  const { sites, schedules, deleteSchedule, queues } = useStore()
+  const { sites, schedules, deleteSchedule, updateSchedule, queues } = useStore()
   const [viewMode, setViewMode] = useState<'list' | 'week'>('list')
   const [filterSiteId, setFilterSiteId] = useState('')
   const [filterDate, setFilterDate] = useState('')
   const [weekBaseDate, setWeekBaseDate] = useState(formatDate(new Date()))
+  const [quickEditSchedule, setQuickEditSchedule] = useState<Schedule | null>(null)
+  const [quickStations, setQuickStations] = useState('')
+  const [quickCapacity, setQuickCapacity] = useState('')
+  const [quickInterval, setQuickInterval] = useState('')
 
   const filteredSchedules = useMemo(() => {
     let list = [...schedules]
@@ -111,6 +115,60 @@ export default function SchedulesIndex() {
     setTimeout(() => {
       Taro.navigateTo({ url: `/pages/queue/detail?scheduleId=${id}` })
     }, 100)
+  }
+
+  const handleSiteDetail = (siteId: string, date: string) => {
+    Taro.navigateTo({ url: `/pages/sites/detail?siteId=${siteId}&date=${date}` })
+  }
+
+  const openQuickEdit = (sch: Schedule) => {
+    setQuickEditSchedule(sch)
+    setQuickStations(String(sch.stations))
+    setQuickCapacity(String(sch.capacityPerSlot || 10))
+    setQuickInterval(String(sch.slotIntervalMin || 60))
+  }
+
+  const closeQuickEdit = () => {
+    setQuickEditSchedule(null)
+  }
+
+  const saveQuickEdit = () => {
+    if (!quickEditSchedule) return
+    const stations = parseInt(quickStations)
+    const capacity = parseInt(quickCapacity)
+    const interval = parseInt(quickInterval)
+    if (isNaN(stations) || stations < 1 || stations > 50) {
+      Taro.showToast({ title: '采位数1-50', icon: 'none' })
+      return
+    }
+    if (isNaN(capacity) || capacity < 1 || capacity > 200) {
+      Taro.showToast({ title: '容量1-200', icon: 'none' })
+      return
+    }
+    if (isNaN(interval) || interval < 15 || interval > 240) {
+      Taro.showToast({ title: '时段间隔15-240分钟', icon: 'none' })
+      return
+    }
+    updateSchedule(quickEditSchedule.id, {
+      stations,
+      capacityPerSlot: capacity,
+      slotIntervalMin: interval
+    })
+    Taro.showToast({ title: '已保存', icon: 'success' })
+    closeQuickEdit()
+  }
+
+  const showScheduleActions = (sch: Schedule, date: string) => {
+    Taro.showActionSheet({
+      itemList: ['查看运营详情', '进入叫号台', '快速调整', '编辑排班', '删除排班'],
+      success: (res) => {
+        if (res.tapIndex === 0) handleSiteDetail(sch.siteId, date)
+        else if (res.tapIndex === 1) handleQueue(sch.id)
+        else if (res.tapIndex === 2) openQuickEdit(sch)
+        else if (res.tapIndex === 3) handleEdit(sch.id)
+        else if (res.tapIndex === 4) handleDelete(sch.id, sch.siteName, sch.date)
+      }
+    })
   }
 
   const prevWeek = () => {
@@ -262,7 +320,7 @@ export default function SchedulesIndex() {
                                 <View
                                   key={sch.id}
                                   className={`week-cell-schedule ${stat.total > 0 ? 'has-queue' : ''}`}
-                                  onClick={() => handleQueue(sch.id)}
+                                  onClick={(e) => { e.stopPropagation(); showScheduleActions(sch, d) }}
                                 >
                                   <View className='week-cell-time'>{sch.startTime}-{sch.endTime}</View>
                                   <View className='week-cell-meta'>
@@ -295,7 +353,7 @@ export default function SchedulesIndex() {
                 }, 0)
                 const taken = weekQueues.filter(q => q.status !== 'cancelled').length
                 const completed = weekQueues.filter(q => q.status === 'completed').length
-                const cancelled = weekQueues.filter(q => q.status === 'cancelled').length
+                const missedCancelled = weekQueues.filter(q => q.status === 'cancelled' && q.missedCount >= 3).length
                 return (
                   <View className='stat-grid'>
                     <View className='stat-card'>
@@ -311,8 +369,8 @@ export default function SchedulesIndex() {
                       <Text className='stat-card-label'>周完成数</Text>
                     </View>
                     <View className='stat-card'>
-                      <Text className='stat-card-value text-danger'>{cancelled}</Text>
-                      <Text className='stat-card-label'>周作废数</Text>
+                      <Text className='stat-card-value text-danger'>{missedCancelled}</Text>
+                      <Text className='stat-card-label'>周过号作废</Text>
                     </View>
                   </View>
                 )
@@ -413,6 +471,55 @@ export default function SchedulesIndex() {
           </>
         )}
       </View>
+
+      {quickEditSchedule && (
+        <View className='quick-edit-mask' onClick={closeQuickEdit}>
+          <View className='quick-edit-panel' onClick={(e) => e.stopPropagation()}>
+            <View className='quick-edit-title'>快速调整排班</View>
+            <View className='quick-edit-sub'>
+              {quickEditSchedule.date} {quickEditSchedule.siteName}
+            </View>
+
+            <View className='form-item'>
+              <Text className='form-label'>采血位数量</Text>
+              <Input
+                className='form-input'
+                type='number'
+                value={quickStations}
+                onInput={(e) => setQuickStations(e.detail.value)}
+                placeholder='请输入采位数'
+              />
+            </View>
+
+            <View className='form-item'>
+              <Text className='form-label'>每时段容量（人）</Text>
+              <Input
+                className='form-input'
+                type='number'
+                value={quickCapacity}
+                onInput={(e) => setQuickCapacity(e.detail.value)}
+                placeholder='请输入每时段容量'
+              />
+            </View>
+
+            <View className='form-item'>
+              <Text className='form-label'>时段间隔（分钟）</Text>
+              <Input
+                className='form-input'
+                type='number'
+                value={quickInterval}
+                onInput={(e) => setQuickInterval(e.detail.value)}
+                placeholder='请输入时段间隔'
+              />
+            </View>
+
+            <View className='footer-actions'>
+              <View className='btn btn-secondary flex-1' onClick={closeQuickEdit}>取消</View>
+              <View className='btn btn-primary flex-1' onClick={saveQuickEdit}>保存</View>
+            </View>
+          </View>
+        </View>
+      )}
     </ScrollView>
   )
 }

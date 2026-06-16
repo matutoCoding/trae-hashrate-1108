@@ -329,9 +329,11 @@ export default function QueueDetail() {
             {schedule.stations}采血位 · 每{slotInterval}分钟{schedule.capacityPerSlot || 10}人
           </Text>
         </View>
-        <View className='schedule-info-stations'>
-          <Text className='stations-num'>{schedule.stations}</Text>
-          <Text className='stations-label'>采血位</Text>
+        <View className='schedule-info-actions'>
+          <View className='btn-bigscreen' onClick={() => Taro.navigateTo({ url: `/pages/queue/bigscreen?scheduleId=${scheduleId}` })}>
+            <Text className='btn-bigscreen-icon'>🖥️</Text>
+            <Text className='btn-bigscreen-text'>大屏</Text>
+          </View>
         </View>
       </View>
 

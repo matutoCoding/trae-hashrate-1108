@@ -26,7 +26,7 @@ export default function Index() {
   const stats = useMemo(() => {
     const todayCompleted = todayQueue.filter(q => q.status === 'completed').length
     const todayWaiting = todayQueue.filter(q => q.status === 'waiting' || q.status === 'called' || q.status === 'processing').length
-    const todayCancelled = todayQueue.filter(q => q.status === 'cancelled').length
+    const todayMissedCancelled = todayQueue.filter(q => q.status === 'cancelled' && q.missedCount >= 3).length
     const todayTaken = todayQueue.filter(q => q.status !== 'cancelled').length
     const totalCapacity = todaySchedules.reduce((sum, s) => {
       const slots = Math.max(1, Math.floor(
@@ -45,7 +45,7 @@ export default function Index() {
       todayQueueCount: todayTaken,
       todayCompleted,
       todayWaiting,
-      todayCancelled,
+      todayMissedCancelled,
       totalCapacity,
       completionRate,
       donorCount: donors.length,
@@ -61,12 +61,12 @@ export default function Index() {
       totalCapacity: number
       waiting: number
       completed: number
-      cancelled: number
+      missedCancelled: number
       taken: number
       pressurePercent: number
       pressureLabel: string
       pressureCls: string
-      queueScheduleId?: string
+      firstScheduleId?: string
     }> = {}
 
     for (const site of sites) {
@@ -77,7 +77,7 @@ export default function Index() {
         totalCapacity: 0,
         waiting: 0,
         completed: 0,
-        cancelled: 0,
+        missedCancelled: 0,
         taken: 0,
         pressurePercent: 0,
         pressureLabel: '空闲',
@@ -87,24 +87,30 @@ export default function Index() {
 
     for (const s of todaySchedules) {
       if (!siteMap[s.siteId]) continue
-      siteMap[s.siteId].scheduleCount++
+      const row = siteMap[s.siteId]
+      row.scheduleCount++
+      if (!row.firstScheduleId) row.firstScheduleId = s.id
       const slots = Math.max(1, Math.floor(
         (parseInt(s.endTime.split(':')[0]) * 60 + parseInt(s.endTime.split(':')[1])
           - parseInt(s.startTime.split(':')[0]) * 60 - parseInt(s.startTime.split(':')[1]))
         / (s.slotIntervalMin || 60)
       ))
-      siteMap[s.siteId].totalCapacity += slots * (s.capacityPerSlot || 10)
+      row.totalCapacity += slots * (s.capacityPerSlot || 10)
     }
 
     for (const q of todayQueue) {
       const sch = todaySchedules.find(s => s.id === q.scheduleId)
       if (!sch || !siteMap[sch.siteId]) continue
       const row = siteMap[sch.siteId]
-      if (!row.queueScheduleId) row.queueScheduleId = sch.id
-      if (q.status === 'completed') row.completed++
-      else if (q.status === 'cancelled') row.cancelled++
-      else { row.waiting++; row.taken++ }
-      if (q.status !== 'cancelled') row.taken++
+      if (q.status === 'completed') {
+        row.completed++
+        row.taken++
+      } else if (q.status === 'cancelled') {
+        if (q.missedCount >= 3) row.missedCancelled++
+      } else {
+        row.waiting++
+        row.taken++
+      }
     }
 
     return Object.values(siteMap).map(row => {
@@ -141,17 +147,21 @@ export default function Index() {
 
   const goQueue = (scheduleId?: string) => {
     if (scheduleId) {
-      switchTab('/pages/queue/index')
+      Taro.switchTab({ url: '/pages/queue/index' })
       setTimeout(() => {
         Taro.navigateTo({ url: `/pages/queue/detail?scheduleId=${scheduleId}` })
       }, 100)
     } else {
-      switchTab('/pages/queue/index')
+      Taro.switchTab({ url: '/pages/queue/index' })
     }
   }
 
+  const goSiteDetail = (siteId: string) => {
+    Taro.navigateTo({ url: `/pages/sites/detail?siteId=${siteId}&date=${today}` })
+  }
+
   const goSchedules = () => {
-    switchTab('/pages/schedules/index')
+    Taro.switchTab({ url: '/pages/schedules/index' })
   }
 
   const getWeekDay = (dateStr: string) => {
@@ -212,20 +222,20 @@ export default function Index() {
             <Text className='stat-card-value'>{stats.todayQueueCount}</Text>
             <Text className='stat-card-label'>今日取号</Text>
           </View>
-          <View className='stat-card'>
+          <View className='stat-card' onClick={() => goQueue()}>
             <Text className='stat-card-value text-success'>{stats.todayCompleted}</Text>
             <Text className='stat-card-label'>已完成采血</Text>
           </View>
-          <View className='stat-card'>
+          <View className='stat-card' onClick={goSchedules}>
             <Text className='stat-card-value' style={{ color: '#10B981' }}>{stats.completionRate}%</Text>
             <Text className='stat-card-label'>完成率</Text>
           </View>
-          <View className='stat-card'>
+          <View className='stat-card' onClick={() => goQueue()}>
             <Text className='stat-card-value' style={{ color: '#F59E0B' }}>{stats.todayWaiting}</Text>
             <Text className='stat-card-label'>等待采集中</Text>
           </View>
-          <View className='stat-card'>
-            <Text className='stat-card-value text-danger'>{stats.todayCancelled}</Text>
+          <View className='stat-card' onClick={() => goQueue()}>
+            <Text className='stat-card-value text-danger'>{stats.todayMissedCancelled}</Text>
             <Text className='stat-card-label'>过号作废</Text>
           </View>
         </View>
@@ -300,7 +310,7 @@ export default function Index() {
               <View
                 key={row.siteId}
                 className='site-stats-card'
-                onClick={() => row.queueScheduleId ? goQueue(row.queueScheduleId) : goSchedules()}
+                onClick={() => goSiteDetail(row.siteId)}
               >
                 <View className='site-stats-header'>
                   <Text className='site-stats-name'>{row.siteName}</Text>
@@ -310,7 +320,7 @@ export default function Index() {
                   <Text>排班<span className='site-stats-num'>{row.scheduleCount}</span></Text>
                   <Text>等待<span className='site-stats-num' style={{ color: '#F59E0B' }}>{row.waiting}</span></Text>
                   <Text>完成<span className='site-stats-num text-success'>{row.completed}</span></Text>
-                  <Text>作废<span className='site-stats-num text-danger'>{row.cancelled}</span></Text>
+                  <Text>过号作废<span className='site-stats-num text-danger'>{row.missedCancelled}</span></Text>
                 </View>
                 <View className='pressure-bar'>
                   <View className='pressure-bar-fill' style={{ width: `${row.pressurePercent}%` }} />

@@ -3,12 +3,14 @@ export default defineAppConfig({
     'pages/index/index',
     'pages/sites/index',
     'pages/sites/edit',
+    'pages/sites/detail',
     'pages/rules/index',
     'pages/rules/edit',
     'pages/schedules/index',
     'pages/schedules/edit',
     'pages/queue/index',
-    'pages/queue/detail'
+    'pages/queue/detail',
+    'pages/queue/bigscreen'
   ],
   window: {
     backgroundTextStyle: 'light',
